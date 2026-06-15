@@ -677,6 +677,11 @@ async function connectSheet() {
       });
       return obj;
     });
+    // Normalizar tipos: gasto/compra → cargo, inversion → inversion
+    rows.forEach(r=>{
+      if(r.tipo==='gasto'||r.tipo==='compra'||r.tipo==='débito'||r.tipo==='debito') r.tipo='cargo';
+      if(r.tipo==='inversion'||r.tipo==='inversión') r.tipo='inversion';
+    });
     allData = rows.filter(r=>r.monto&&r.monto!=='').sort((a,b)=>new Date(b.fecha)-new Date(a.fecha));
     if(allData.length===0) throw new Error('Sin datos');
     setStatus('live',`${allData.length} registros`);
