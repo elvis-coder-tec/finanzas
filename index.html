@@ -475,6 +475,10 @@
       <label>Hoja</label>
       <input type="text" id="sheetName" value="Transacciones" />
     </div>
+    <div class="field" style="flex:2">
+      <label>Webhook URL (para agregar manual)</label>
+      <input type="text" id="webhookUrl" placeholder="https://..." oninput="WEBHOOK_URL=this.value;localStorage.setItem('webhookUrl',this.value)" />
+    </div>
     <button class="btn-connect" onclick="connectSheet()">Conectar</button>
   </div>
 
@@ -485,6 +489,15 @@
     <button class="time-btn" onclick="setTimeFilter(180,this)">6M</button>
     <button class="time-btn" onclick="setTimeFilter(365,this)">1A</button>
     <button class="time-btn" onclick="setTimeFilter(0,this)">Todo</button>
+    <button class="time-btn" onclick="toggleCustomRange(this)">Personalizado</button>
+    <button class="btn" style="margin-left:auto" onclick="openAddModal()">+ Agregar</button>
+  </div>
+  <div id="customRangeRow" style="display:none;gap:0.5rem;align-items:center;padding:0.5rem 0;flex-wrap:wrap">
+    <span style="font-size:0.72rem;color:var(--text-dim)">Desde</span>
+    <input type="month" id="rangeFrom" style="background:var(--surface);border:1px solid var(--border);color:var(--text);padding:0.3rem 0.6rem;border-radius:6px;font-size:0.78rem" />
+    <span style="font-size:0.72rem;color:var(--text-dim)">Hasta</span>
+    <input type="month" id="rangeTo" style="background:var(--surface);border:1px solid var(--border);color:var(--text);padding:0.3rem 0.6rem;border-radius:6px;font-size:0.78rem" />
+    <button class="btn-connect" style="padding:0.3rem 1rem;font-size:0.78rem" onclick="applyCustomRange()">Aplicar</button>
   </div>
 
   <div class="kpi-grid" id="kpiGrid">
@@ -610,6 +623,66 @@
 </div>
 </div>
 
+<!-- Modal agregar transacción -->
+<div id="addModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:500;display:none;align-items:center;justify-content:center">
+  <div style="background:#111827;border:1px solid var(--border-bright);border-radius:16px;padding:2rem;width:100%;max-width:420px;position:relative">
+    <h3 style="font-size:0.85rem;font-weight:400;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-dim);margin-bottom:1.5rem">Agregar transacción</h3>
+    <div style="display:grid;gap:0.8rem">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.8rem">
+        <div>
+          <label style="font-size:0.7rem;color:var(--text-dim);display:block;margin-bottom:0.3rem">Fecha</label>
+          <input type="date" id="addFecha" style="width:100%;background:var(--surface);border:1px solid var(--border);color:var(--text);padding:0.5rem;border-radius:8px;font-size:0.82rem" />
+        </div>
+        <div>
+          <label style="font-size:0.7rem;color:var(--text-dim);display:block;margin-bottom:0.3rem">Monto (CLP)</label>
+          <input type="number" id="addMonto" placeholder="0" style="width:100%;background:var(--surface);border:1px solid var(--border);color:var(--text);padding:0.5rem;border-radius:8px;font-size:0.82rem" />
+        </div>
+      </div>
+      <div>
+        <label style="font-size:0.7rem;color:var(--text-dim);display:block;margin-bottom:0.3rem">Comercio / Descripción</label>
+        <input type="text" id="addComercio" placeholder="Ej: Jumbo, Netflix..." style="width:100%;background:var(--surface);border:1px solid var(--border);color:var(--text);padding:0.5rem;border-radius:8px;font-size:0.82rem" />
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.8rem">
+        <div>
+          <label style="font-size:0.7rem;color:var(--text-dim);display:block;margin-bottom:0.3rem">Tipo</label>
+          <select id="addTipo" style="width:100%;background:var(--surface);border:1px solid var(--border);color:var(--text);padding:0.5rem;border-radius:8px;font-size:0.82rem">
+            <option value="cargo">cargo</option>
+            <option value="ingreso">ingreso</option>
+            <option value="transferencia">transferencia</option>
+            <option value="inversion">inversion</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:0.7rem;color:var(--text-dim);display:block;margin-bottom:0.3rem">Categoría</label>
+          <select id="addCategoria" style="width:100%;background:var(--surface);border:1px solid var(--border);color:var(--text);padding:0.5rem;border-radius:8px;font-size:0.82rem">
+            <option value="alimentacion">alimentacion</option>
+            <option value="transporte">transporte</option>
+            <option value="entretenimiento">entretenimiento</option>
+            <option value="salud">salud</option>
+            <option value="inversion">inversion</option>
+            <option value="servicios">servicios</option>
+            <option value="educacion">educacion</option>
+            <option value="vestuario">vestuario</option>
+            <option value="tecnologia">tecnologia</option>
+            <option value="viajes">viajes</option>
+            <option value="transferencia">transferencia</option>
+            <option value="otro">otro</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <label style="font-size:0.7rem;color:var(--text-dim);display:block;margin-bottom:0.3rem">Banco</label>
+        <input type="text" id="addBanco" placeholder="Ej: Banco de Chile" style="width:100%;background:var(--surface);border:1px solid var(--border);color:var(--text);padding:0.5rem;border-radius:8px;font-size:0.82rem" />
+      </div>
+    </div>
+    <div id="addError" style="display:none;color:var(--red);font-size:0.72rem;margin-top:0.8rem"></div>
+    <div style="display:flex;gap:0.5rem;margin-top:1.2rem">
+      <button onclick="closeAddModal()" style="flex:1;padding:0.6rem;background:var(--surface);border:1px solid var(--border);color:var(--text-dim);border-radius:8px;cursor:pointer;font-size:0.8rem">Cancelar</button>
+      <button onclick="submitAdd()" id="addSubmitBtn" style="flex:2;padding:0.6rem;background:var(--blue);border:none;color:#fff;border-radius:8px;cursor:pointer;font-size:0.8rem;font-weight:500">Guardar transacción</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ─── CONFIG ──────────────────────────
 const PASSWORD   = 'F51tazcg';
@@ -622,11 +695,14 @@ let filteredData = [];
 let displayData = [];
 let activeType = 'todos';
 let activeDays = 90;
+let activeMonthFrom = null; // 'YYYY-MM'
+let activeMonthTo = null;   // 'YYYY-MM'
 let sortCol = 'fecha';
 let sortDir = -1;
 let charts = {};
 let scoreRingChart = null;
 let compChart = null;
+let WEBHOOK_URL = localStorage.getItem('webhookUrl') || '';
 
 const CAT_COLORS = {
   alimentacion:'#f87171', transporte:'#fbbf24', entretenimiento:'#a78bfa',
@@ -644,6 +720,7 @@ function checkPassword() {
     document.getElementById('appContent').style.display = 'block';
     document.getElementById('sheetId').value = SHEET_ID;
     document.getElementById('sheetName').value = SHEET_NAME;
+    document.getElementById('webhookUrl').value = WEBHOOK_URL;
     connectSheet();
   } else {
     document.getElementById('loginError').style.display = 'block';
@@ -670,19 +747,22 @@ async function connectSheet() {
       const obj={};
       r.c.forEach((cell,i)=>{
         let val = cell ? cell.v : '';
-        if(cols[i]==='monto' && typeof val==='string') {
-          val = parseFloat(val.replace(/\./g,'').replace(',','.'));
+        if(cols[i]==='fecha') val = parseGvizDate(val);
+        if(cols[i]==='monto') {
+          if(typeof val==='string') val = parseFloat(val.replace(/\./g,'').replace(',','.'));
+          val = Number(val)||0;
         }
         obj[cols[i]] = val;
       });
       return obj;
     });
-    // Normalizar tipos: gasto/compra → cargo, inversion → inversion
+    // Normalizar tipos y categorías
     rows.forEach(r=>{
       if(r.tipo==='gasto'||r.tipo==='compra'||r.tipo==='débito'||r.tipo==='debito') r.tipo='cargo';
       if(r.tipo==='inversion'||r.tipo==='inversión') r.tipo='inversion';
+      if(r.tipo==='transferencia' && (!r.categoria||r.categoria==='otro')) r.categoria='transferencia';
     });
-    allData = rows.filter(r=>r.monto&&r.monto!=='').sort((a,b)=>new Date(b.fecha)-new Date(a.fecha));
+    allData = rows.filter(r=>r.monto&&r.monto!==0).sort((a,b)=>new Date(b.fecha)-new Date(a.fecha));
     if(allData.length===0) throw new Error('Sin datos');
     setStatus('live',`${allData.length} registros`);
     document.getElementById('configPanel').classList.add('hidden');
@@ -700,19 +780,67 @@ function setStatus(cls,text) {
   el.innerHTML=`<span class="status-dot"></span><span>${text}</span>`;
 }
 
+// ─── DATE HELPERS ────────────────────
+function parseGvizDate(val) {
+  if(!val && val!==0) return '';
+  const s = String(val);
+  // gviz format: Date(2026,5,6,0,0,0) — month is 0-indexed
+  const m = s.match(/^Date\((\d+),(\d+),(\d+)/);
+  if(m) return `${m[1]}-${String(+m[2]+1).padStart(2,'0')}-${String(+m[3]).padStart(2,'0')}`;
+  // ISO or partial: keep first 10 chars
+  return s.substring(0,10);
+}
+
+function fmtDate(fecha) {
+  if(!fecha) return '—';
+  const d = new Date(fecha+'T12:00:00');
+  if(isNaN(d)) return fecha;
+  return d.toLocaleDateString('es-CL',{day:'2-digit',month:'short',year:'numeric'});
+}
+
 function setTimeFilter(days,btn) {
-  activeDays=days;
+  activeDays=days; activeMonthFrom=null; activeMonthTo=null;
   document.querySelectorAll('.time-btn').forEach(b=>b.classList.remove('active'));
   if(btn) btn.classList.add('active');
+  document.getElementById('customRangeRow').style.display='none';
+  applyFilters();
+}
+
+function toggleCustomRange(btn) {
+  document.querySelectorAll('.time-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  const row = document.getElementById('customRangeRow');
+  row.style.display = row.style.display==='none' ? 'flex' : 'none';
+}
+
+function applyCustomRange() {
+  const from = document.getElementById('rangeFrom').value;
+  const to   = document.getElementById('rangeTo').value;
+  if(!from||!to) return;
+  activeMonthFrom = from; activeMonthTo = to; activeDays = -1;
   applyFilters();
 }
 
 function applyFilters() {
   const now=new Date();
-  filteredData = activeDays===0 ? [...allData] : allData.filter(r=>{
-    const d=new Date(r.fecha);
-    return (now-d)/86400000<=activeDays;
-  });
+  if(activeMonthFrom && activeMonthTo) {
+    const [fy,fm] = activeMonthFrom.split('-').map(Number);
+    const [ty,tm] = activeMonthTo.split('-').map(Number);
+    filteredData = allData.filter(r=>{
+      const d=new Date(r.fecha+'T12:00:00');
+      if(isNaN(d)) return false;
+      const ry=d.getFullYear(), rm=d.getMonth()+1;
+      return (ry>fy||(ry===fy&&rm>=fm)) && (ry<ty||(ry===ty&&rm<=tm));
+    });
+  } else if(activeDays===0) {
+    filteredData=[...allData];
+  } else {
+    filteredData=allData.filter(r=>{
+      const d=new Date(r.fecha+'T12:00:00');
+      if(isNaN(d)) return false;
+      return (now-d)/86400000<=activeDays;
+    });
+  }
   renderDashboard(filteredData);
 }
 
@@ -1120,7 +1248,7 @@ function displayTable(data) {
   const amtPfx=r=>r.tipo==='ingreso'?'+':r.tipo==='inversion'?'→':'-';
   document.getElementById('transactionsBody').innerHTML=data.slice(0,80).map(r=>`
     <tr>
-      <td style="font-family:'JetBrains Mono',monospace;font-size:0.72rem;color:var(--text-faint)">${r.fecha}</td>
+      <td style="font-family:'JetBrains Mono',monospace;font-size:0.72rem;color:var(--text-faint);white-space:nowrap">${fmtDate(r.fecha)}</td>
       <td>${r.comercio||'—'}</td>
       <td class="hide-mobile"><span class="tag">${r.categoria||'—'}</span></td>
       <td class="hide-mobile"><span class="tag">${r.tipo||'—'}</span></td>
@@ -1128,6 +1256,60 @@ function displayTable(data) {
     </tr>
   `).join('')||'<tr><td colspan="5" style="text-align:center;color:var(--text-faint);padding:2.5rem;letter-spacing:0.08em;font-size:0.75rem">sin transacciones</td></tr>';
 }
+
+// ─── MODAL AGREGAR ───────────────────
+function openAddModal() {
+  const today = new Date().toISOString().substring(0,10);
+  document.getElementById('addFecha').value = today;
+  document.getElementById('addMonto').value = '';
+  document.getElementById('addComercio').value = '';
+  document.getElementById('addBanco').value = 'Banco de Chile';
+  document.getElementById('addError').style.display = 'none';
+  document.getElementById('addModal').style.display = 'flex';
+}
+function closeAddModal() {
+  document.getElementById('addModal').style.display = 'none';
+}
+async function submitAdd() {
+  const fecha    = document.getElementById('addFecha').value;
+  const monto    = Number(document.getElementById('addMonto').value);
+  const comercio = document.getElementById('addComercio').value.trim();
+  const tipo     = document.getElementById('addTipo').value;
+  const categoria= document.getElementById('addCategoria').value;
+  const banco    = document.getElementById('addBanco').value.trim();
+  const errEl    = document.getElementById('addError');
+
+  if(!fecha||!monto||!comercio) {
+    errEl.textContent='Completa fecha, monto y comercio.';
+    errEl.style.display='block'; return;
+  }
+  if(!WEBHOOK_URL) {
+    errEl.textContent='Configura la URL del webhook en config → Webhook URL.';
+    errEl.style.display='block'; return;
+  }
+
+  const btn = document.getElementById('addSubmitBtn');
+  btn.textContent='Guardando...'; btn.disabled=true;
+
+  try {
+    const clave = `${fecha}_${comercio.toLowerCase().replace(/[^a-z0-9]/g,'').substring(0,10)}_${monto}`;
+    await fetch(WEBHOOK_URL, {
+      method:'POST', mode:'no-cors',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({fecha,monto,comercio,tipo,categoria,banco,moneda:'CLP',
+        email_id:`manual_${Date.now()}`, clave})
+    });
+    closeAddModal();
+    setTimeout(connectSheet, 1500); // refrescar datos
+  } catch(e) {
+    errEl.textContent='Error al guardar. Verifica el webhook.';
+    errEl.style.display='block';
+  }
+  btn.textContent='Guardar transacción'; btn.disabled=false;
+}
+document.getElementById('addModal').addEventListener('click', e=>{
+  if(e.target===document.getElementById('addModal')) closeAddModal();
+});
 
 setInterval(connectSheet, 5*60*1000);
 </script>
