@@ -485,19 +485,49 @@
   <div class="time-filter">
     <button class="time-btn" onclick="setTimeFilter(7,this)">7D</button>
     <button class="time-btn" onclick="setTimeFilter(30,this)">30D</button>
-    <button class="time-btn active" onclick="setTimeFilter(90,this)">3M</button>
+    <button class="time-btn" onclick="setTimeFilter(90,this)">3M</button>
     <button class="time-btn" onclick="setTimeFilter(180,this)">6M</button>
     <button class="time-btn" onclick="setTimeFilter(365,this)">1A</button>
-    <button class="time-btn" onclick="setTimeFilter(0,this)">Todo</button>
+    <button class="time-btn active" onclick="setTimeFilter(0,this)">Todo</button>
     <button class="time-btn" onclick="toggleCustomRange(this)">Personalizado</button>
-    <button class="btn" style="margin-left:auto" onclick="openAddModal()">+ Agregar</button>
+    <div style="margin-left:auto;display:flex;gap:0.4rem">
+      <button class="btn" onclick="toggleSaldo()">$ Saldo</button>
+      <button class="btn" onclick="openAddModal()">+ Agregar</button>
+    </div>
   </div>
-  <div id="customRangeRow" style="display:none;gap:0.5rem;align-items:center;padding:0.5rem 0;flex-wrap:wrap">
+  <div id="customRangeRow" style="display:none;gap:0.5rem;align-items:center;padding:0.6rem 0;flex-wrap:wrap">
     <span style="font-size:0.72rem;color:var(--text-dim)">Desde</span>
-    <input type="month" id="rangeFrom" style="background:var(--surface);border:1px solid var(--border);color:var(--text);padding:0.3rem 0.6rem;border-radius:6px;font-size:0.78rem" />
+    <select id="rangeFromM" style="background:var(--surface);border:1px solid var(--border);color:var(--text);padding:0.35rem 0.5rem;border-radius:6px;font-size:0.78rem">
+      <option value="01">Ene</option><option value="02">Feb</option><option value="03">Mar</option>
+      <option value="04">Abr</option><option value="05">May</option><option value="06">Jun</option>
+      <option value="07">Jul</option><option value="08">Ago</option><option value="09">Sep</option>
+      <option value="10">Oct</option><option value="11">Nov</option><option value="12">Dic</option>
+    </select>
+    <select id="rangeFromY" style="background:var(--surface);border:1px solid var(--border);color:var(--text);padding:0.35rem 0.5rem;border-radius:6px;font-size:0.78rem">
+      <option value="2024">2024</option><option value="2025">2025</option><option value="2026" selected>2026</option>
+    </select>
     <span style="font-size:0.72rem;color:var(--text-dim)">Hasta</span>
-    <input type="month" id="rangeTo" style="background:var(--surface);border:1px solid var(--border);color:var(--text);padding:0.3rem 0.6rem;border-radius:6px;font-size:0.78rem" />
-    <button class="btn-connect" style="padding:0.3rem 1rem;font-size:0.78rem" onclick="applyCustomRange()">Aplicar</button>
+    <select id="rangeToM" style="background:var(--surface);border:1px solid var(--border);color:var(--text);padding:0.35rem 0.5rem;border-radius:6px;font-size:0.78rem">
+      <option value="01">Ene</option><option value="02">Feb</option><option value="03">Mar</option>
+      <option value="04">Abr</option><option value="05">May</option><option value="06">Jun</option>
+      <option value="07">Jul</option><option value="08">Ago</option><option value="09">Sep</option>
+      <option value="10">Oct</option><option value="11">Nov</option><option value="12">Dic</option>
+    </select>
+    <select id="rangeToY" style="background:var(--surface);border:1px solid var(--border);color:var(--text);padding:0.35rem 0.5rem;border-radius:6px;font-size:0.78rem">
+      <option value="2024">2024</option><option value="2025">2025</option><option value="2026" selected>2026</option>
+    </select>
+    <button class="btn-connect" style="padding:0.35rem 1rem;font-size:0.78rem" onclick="applyCustomRange()">Aplicar</button>
+  </div>
+
+  <!-- Saldo actual -->
+  <div id="saldoBar" style="display:none;align-items:center;gap:1rem;padding:0.6rem 1rem;background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-top:0.5rem;flex-wrap:wrap">
+    <span style="font-size:0.72rem;color:var(--text-dim);letter-spacing:0.08em;text-transform:uppercase">Saldo actual</span>
+    <div style="display:flex;align-items:center;gap:0.4rem">
+      <span style="color:var(--text-faint);font-size:0.82rem">$</span>
+      <input type="number" id="saldoActualInput" placeholder="0" oninput="updateSaldo(this.value)"
+        style="background:transparent;border:none;border-bottom:1px solid var(--border-bright);color:var(--text);padding:0.2rem 0.3rem;font-size:0.95rem;font-family:'JetBrains Mono',monospace;width:140px;outline:none" />
+    </div>
+    <div id="proyeccionEl" style="font-size:0.78rem;color:var(--text-dim)"></div>
   </div>
 
   <div class="kpi-grid" id="kpiGrid">
@@ -694,7 +724,8 @@ let allData = [];
 let filteredData = [];
 let displayData = [];
 let activeType = 'todos';
-let activeDays = 90;
+let activeDays = 0;
+let saldoActual = Number(localStorage.getItem('saldoActual')) || 0;
 let activeMonthFrom = null; // 'YYYY-MM'
 let activeMonthTo = null;   // 'YYYY-MM'
 let sortCol = 'fecha';
@@ -721,6 +752,10 @@ function checkPassword() {
     document.getElementById('sheetId').value = SHEET_ID;
     document.getElementById('sheetName').value = SHEET_NAME;
     document.getElementById('webhookUrl').value = WEBHOOK_URL;
+    if(saldoActual) {
+      document.getElementById('saldoBar').style.display='flex';
+      document.getElementById('saldoActualInput').value = saldoActual;
+    }
     connectSheet();
   } else {
     document.getElementById('loginError').style.display = 'block';
@@ -814,11 +849,65 @@ function toggleCustomRange(btn) {
 }
 
 function applyCustomRange() {
-  const from = document.getElementById('rangeFrom').value;
-  const to   = document.getElementById('rangeTo').value;
-  if(!from||!to) return;
-  activeMonthFrom = from; activeMonthTo = to; activeDays = -1;
+  const fromM = document.getElementById('rangeFromM').value;
+  const fromY = document.getElementById('rangeFromY').value;
+  const toM   = document.getElementById('rangeToM').value;
+  const toY   = document.getElementById('rangeToY').value;
+  activeMonthFrom = `${fromY}-${fromM}`;
+  activeMonthTo   = `${toY}-${toM}`;
+  activeDays = -1;
   applyFilters();
+}
+
+function toggleSaldo() {
+  const bar = document.getElementById('saldoBar');
+  bar.style.display = bar.style.display==='none'||bar.style.display==='' ? 'flex' : 'none';
+  if(bar.style.display==='flex') {
+    document.getElementById('saldoActualInput').value = saldoActual || '';
+    updateSaldo(saldoActual);
+  }
+}
+
+function updateSaldo(val) {
+  saldoActual = Number(val) || 0;
+  localStorage.setItem('saldoActual', saldoActual);
+  renderProyeccion();
+}
+
+function renderProyeccion() {
+  const fmt = v => new Intl.NumberFormat('es-CL',{style:'currency',currency:'CLP',maximumFractionDigits:0}).format(v);
+  const now = new Date();
+  const diasEnMes = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
+  const diaHoy = now.getDate();
+  const diasRestantes = diasEnMes - diaHoy;
+
+  // Gastos del mes actual (cargo + transferencia)
+  const gastosMes = allData.filter(r=>{
+    const d = new Date(r.fecha+'T12:00:00');
+    return !isNaN(d) && d.getFullYear()===now.getFullYear() && d.getMonth()===now.getMonth()
+      && (r.tipo==='cargo'||r.tipo==='transferencia');
+  }).reduce((s,r)=>s+Number(r.monto),0);
+
+  // Ingresos del mes actual
+  const ingresosMes = allData.filter(r=>{
+    const d = new Date(r.fecha+'T12:00:00');
+    return !isNaN(d) && d.getFullYear()===now.getFullYear() && d.getMonth()===now.getMonth()
+      && r.tipo==='ingreso';
+  }).reduce((s,r)=>s+Number(r.monto),0);
+
+  const gastoDiario = diaHoy > 0 ? gastosMes / diaHoy : 0;
+  const gastoProyectado = gastoDiario * diasRestantes;
+  const proyeccion = saldoActual + ingresosMes - gastoProyectado;
+
+  const el = document.getElementById('proyeccionEl');
+  if(!el) return;
+  el.innerHTML = `
+    <span style="color:var(--text-faint)">Quema diaria ~${fmt(gastoDiario)}</span>
+    <span style="margin:0 0.5rem;color:var(--border-bright)">·</span>
+    <span style="color:var(--text-dim)">Proyección fin de mes:</span>
+    <span style="margin-left:0.4rem;font-weight:500;color:${proyeccion>=0?'var(--green)':'var(--red)'};font-family:'JetBrains Mono',monospace">${fmt(proyeccion)}</span>
+    ${ingresosMes>0?`<span style="margin-left:0.5rem;font-size:0.7rem;color:var(--green)">(+${fmt(ingresosMes)} ingresos)</span>`:''}
+  `;
 }
 
 function applyFilters() {
@@ -849,6 +938,7 @@ function renderDashboard(data) {
   renderAnalysis(data);
   renderCharts(data);
   renderTable(data,activeType);
+  renderProyeccion();
   document.getElementById('analysisSection').style.display='block';
   document.getElementById('chartsGrid').style.display='grid';
   document.getElementById('chartsTitle').style.display='block';
