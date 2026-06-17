@@ -797,7 +797,13 @@ async function connectSheet() {
       if(r.tipo==='inversion'||r.tipo==='inversión') r.tipo='inversion';
       if(r.tipo==='transferencia' && (!r.categoria||r.categoria==='otro')) r.categoria='transferencia';
     });
-    allData = rows.filter(r=>r.monto&&r.monto!==0).sort((a,b)=>new Date(b.fecha)-new Date(a.fecha));
+    allData = rows.filter(r=>r.monto&&r.monto!==0).sort((a,b)=>{
+      const da=a.fecha?new Date(a.fecha):null, db=b.fecha?new Date(b.fecha):null;
+      if(!da&&!db) return 0;
+      if(!da) return 1;
+      if(!db) return -1;
+      return db-da;
+    });
     if(allData.length===0) throw new Error('Sin datos');
     setStatus('live',`${allData.length} registros`);
     document.getElementById('configPanel').classList.add('hidden');
@@ -819,18 +825,31 @@ function setStatus(cls,text) {
 function parseGvizDate(val) {
   if(!val && val!==0) return '';
   const s = String(val);
-  // gviz format: Date(2026,5,6,0,0,0) — month is 0-indexed
-  const m = s.match(/^Date\((\d+),(\d+),(\d+)/);
-  if(m) return `${m[1]}-${String(+m[2]+1).padStart(2,'0')}-${String(+m[3]).padStart(2,'0')}`;
-  // ISO or partial: keep first 10 chars
-  return s.substring(0,10);
+  // gviz format: Date(2026,5,6,21,27,0) — month is 0-indexed
+  const m = s.match(/^Date\((\d+),(\d+),(\d+),(\d+),(\d+)/);
+  if(m) {
+    const base = `${m[1]}-${String(+m[2]+1).padStart(2,'0')}-${String(+m[3]).padStart(2,'0')}`;
+    const hasTime = +m[4]||+m[5];
+    return hasTime ? `${base}T${String(+m[4]).padStart(2,'0')}:${String(+m[5]).padStart(2,'0')}:00` : base;
+  }
+  // ISO datetime or plain date — return as-is
+  return s;
 }
 
 function fmtDate(fecha) {
   if(!fecha) return '—';
-  const d = new Date(fecha+'T12:00:00');
+  const hasTime = fecha.includes('T') && !fecha.endsWith('T00:00:00');
+  const d = hasTime ? new Date(fecha) : new Date(fecha + 'T12:00:00');
   if(isNaN(d)) return fecha;
-  return d.toLocaleDateString('es-CL',{day:'2-digit',month:'short',year:'numeric'});
+  const dd = String(d.getDate()).padStart(2,'0');
+  const mm = String(d.getMonth()+1).padStart(2,'0');
+  const yy = String(d.getFullYear()).slice(-2);
+  if(hasTime) {
+    const hh = String(d.getHours()).padStart(2,'0');
+    const min = String(d.getMinutes()).padStart(2,'0');
+    return `${dd}/${mm}/${yy} ${hh}:${min}`;
+  }
+  return `${dd}/${mm}/${yy}`;
 }
 
 function setTimeFilter(days,btn) {
@@ -1326,6 +1345,13 @@ function sortTable(col) {
   let data=q?currentTableData.filter(r=>(r.comercio||'').toLowerCase().includes(q)):currentTableData;
   data=[...data].sort((a,b)=>{
     let av=a[col],bv=b[col];
+    if(col==='fecha'){
+      const da=av?new Date(av):null, db=bv?new Date(bv):null;
+      if(!da&&!db) return 0;
+      if(!da) return 1;
+      if(!db) return -1;
+      return currentSort.dir===-1?db-da:da-db;
+    }
     if(col==='monto'){av=Number(av);bv=Number(bv);}
     return av<bv?-currentSort.dir:av>bv?currentSort.dir:0;
   });
