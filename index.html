@@ -520,14 +520,27 @@
   </div>
 
   <!-- Saldo actual -->
-  <div id="saldoBar" style="display:none;align-items:center;gap:1rem;padding:0.6rem 1rem;background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-top:0.5rem;flex-wrap:wrap">
-    <span style="font-size:0.72rem;color:var(--text-dim);letter-spacing:0.08em;text-transform:uppercase">Saldo actual</span>
-    <div style="display:flex;align-items:center;gap:0.4rem">
-      <span style="color:var(--text-faint);font-size:0.82rem">$</span>
-      <input type="number" id="saldoActualInput" placeholder="0" oninput="updateSaldo(this.value)"
-        style="background:transparent;border:none;border-bottom:1px solid var(--border-bright);color:var(--text);padding:0.2rem 0.3rem;font-size:0.95rem;font-family:'JetBrains Mono',monospace;width:140px;outline:none" />
+  <div id="saldoBar" style="display:none;flex-direction:column;gap:0.5rem;padding:1.2rem 1.4rem;background:var(--surface);border:1px solid var(--border-bright);border-radius:14px;margin-top:0.6rem">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:0.8rem">
+      <div>
+        <div style="font-size:0.65rem;color:var(--text-faint);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:0.25rem">Saldo actual</div>
+        <div style="display:flex;align-items:baseline;gap:0.35rem">
+          <span style="color:var(--text-dim);font-size:1rem;font-family:'JetBrains Mono',monospace">$</span>
+          <span id="saldoEfectivoDisplay" style="font-size:2.4rem;font-family:'JetBrains Mono',monospace;font-weight:300;color:var(--green);letter-spacing:-0.02em">0</span>
+        </div>
+        <div id="saldoDeltaEl" style="font-size:0.72rem;color:var(--text-faint);margin-top:0.15rem"></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:0.35rem;align-items:flex-end">
+        <div style="font-size:0.65rem;color:var(--text-faint);letter-spacing:0.08em;text-transform:uppercase">Establecer base</div>
+        <div style="display:flex;align-items:center;gap:0.4rem">
+          <span style="color:var(--text-faint);font-size:0.78rem">$</span>
+          <input type="number" id="saldoActualInput" placeholder="ingresa tu saldo" oninput="updateSaldo(this.value)"
+            style="background:transparent;border:none;border-bottom:1px solid var(--border-bright);color:var(--text-dim);padding:0.15rem 0.3rem;font-size:0.85rem;font-family:'JetBrains Mono',monospace;width:150px;outline:none;text-align:right" />
+        </div>
+        <div id="saldoBaseDateEl" style="font-size:0.65rem;color:var(--text-faint)"></div>
+      </div>
     </div>
-    <div id="proyeccionEl" style="font-size:0.78rem;color:var(--text-dim)"></div>
+    <div id="proyeccionEl" style="font-size:0.78rem;color:var(--text-dim);padding-top:0.4rem;border-top:1px solid var(--border)"></div>
   </div>
 
   <div class="kpi-grid" id="kpiGrid">
@@ -725,7 +738,9 @@ let filteredData = [];
 let displayData = [];
 let activeType = 'todos';
 let activeDays = 0;
-let saldoActual = Number(localStorage.getItem('saldoActual')) || 0;
+let saldoBase = Number(localStorage.getItem('saldoBase')) || 0;
+let saldoBaseDate = localStorage.getItem('saldoBaseDate') || null;
+let saldoActual = saldoBase; // compat
 let activeMonthFrom = null; // 'YYYY-MM'
 let activeMonthTo = null;   // 'YYYY-MM'
 let sortCol = 'fecha';
@@ -752,9 +767,10 @@ function checkPassword() {
     document.getElementById('sheetId').value = SHEET_ID;
     document.getElementById('sheetName').value = SHEET_NAME;
     document.getElementById('webhookUrl').value = WEBHOOK_URL;
-    if(saldoActual) {
+    if(saldoBase) {
       document.getElementById('saldoBar').style.display='flex';
-      document.getElementById('saldoActualInput').value = saldoActual;
+      document.getElementById('saldoActualInput').value = saldoBase;
+      updateSaldoDisplay();
     }
     connectSheet();
   } else {
@@ -809,6 +825,7 @@ async function connectSheet() {
     if(allData.length===0) throw new Error('Sin datos');
     setStatus('live',`${allData.length} registros`);
     document.getElementById('configPanel').classList.add('hidden');
+    if(saldoBase) updateSaldoDisplay();
     applyFilters();
   } catch(e) {
     console.error(e);
@@ -884,14 +901,60 @@ function toggleSaldo() {
   const bar = document.getElementById('saldoBar');
   bar.style.display = bar.style.display==='none'||bar.style.display==='' ? 'flex' : 'none';
   if(bar.style.display==='flex') {
-    document.getElementById('saldoActualInput').value = saldoActual || '';
-    updateSaldo(saldoActual);
+    document.getElementById('saldoActualInput').value = saldoBase || '';
+    if(saldoBase) updateSaldoDisplay();
   }
 }
 
 function updateSaldo(val) {
-  saldoActual = Number(val) || 0;
-  localStorage.setItem('saldoActual', saldoActual);
+  saldoBase = Number(val) || 0;
+  saldoBaseDate = new Date().toISOString();
+  saldoActual = saldoBase;
+  localStorage.setItem('saldoBase', saldoBase);
+  localStorage.setItem('saldoBaseDate', saldoBaseDate);
+  updateSaldoDisplay();
+  renderProyeccion();
+}
+
+function calcSaldoEfectivo() {
+  if(!saldoBase || !saldoBaseDate) return {efectivo:0, ingresosDelta:0, cargosDelta:0};
+  const baseDate = new Date(saldoBaseDate);
+  let ingresosDelta = 0, cargosDelta = 0;
+  allData.forEach(r=>{
+    const d = new Date(r.fecha);
+    if(isNaN(d)||d<baseDate) return;
+    const m = Number(r.monto)||0;
+    if(r.tipo==='ingreso') ingresosDelta += m;
+    else if(r.tipo==='cargo'||r.tipo==='transferencia'||r.tipo==='inversion') cargosDelta += m;
+  });
+  return {efectivo: saldoBase + ingresosDelta - cargosDelta, ingresosDelta, cargosDelta};
+}
+
+function updateSaldoDisplay() {
+  const fmt = v => new Intl.NumberFormat('es-CL',{style:'currency',currency:'CLP',maximumFractionDigits:0}).format(v);
+  const {efectivo, ingresosDelta, cargosDelta} = calcSaldoEfectivo();
+  saldoActual = efectivo;
+
+  const disp = document.getElementById('saldoEfectivoDisplay');
+  if(disp) {
+    disp.textContent = new Intl.NumberFormat('es-CL',{maximumFractionDigits:0}).format(efectivo);
+    disp.style.color = efectivo >= 0 ? 'var(--green)' : 'var(--red)';
+  }
+
+  const delta = document.getElementById('saldoDeltaEl');
+  if(delta && saldoBaseDate) {
+    const d = new Date(saldoBaseDate);
+    const fmtD = `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getFullYear()).slice(-2)}`;
+    const netDelta = ingresosDelta - cargosDelta;
+    delta.innerHTML = `desde ${fmtD} &nbsp;·&nbsp; <span style="color:${netDelta>=0?'var(--green)':'var(--red)'}">${netDelta>=0?'+':''}${fmt(netDelta)}</span>`;
+  }
+
+  const baseDateEl = document.getElementById('saldoBaseDateEl');
+  if(baseDateEl && saldoBaseDate) {
+    const d = new Date(saldoBaseDate);
+    baseDateEl.textContent = `base al ${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getFullYear()).slice(-2)} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+  }
+
   renderProyeccion();
 }
 
@@ -902,32 +965,30 @@ function renderProyeccion() {
   const diaHoy = now.getDate();
   const diasRestantes = diasEnMes - diaHoy;
 
-  // Gastos del mes actual (cargo + transferencia)
   const gastosMes = allData.filter(r=>{
-    const d = new Date(r.fecha+'T12:00:00');
+    const d = new Date(r.fecha);
     return !isNaN(d) && d.getFullYear()===now.getFullYear() && d.getMonth()===now.getMonth()
       && (r.tipo==='cargo'||r.tipo==='transferencia');
   }).reduce((s,r)=>s+Number(r.monto),0);
 
-  // Ingresos del mes actual
   const ingresosMes = allData.filter(r=>{
-    const d = new Date(r.fecha+'T12:00:00');
+    const d = new Date(r.fecha);
     return !isNaN(d) && d.getFullYear()===now.getFullYear() && d.getMonth()===now.getMonth()
       && r.tipo==='ingreso';
   }).reduce((s,r)=>s+Number(r.monto),0);
 
   const gastoDiario = diaHoy > 0 ? gastosMes / diaHoy : 0;
   const gastoProyectado = gastoDiario * diasRestantes;
-  const proyeccion = saldoActual + ingresosMes - gastoProyectado;
+  const proyeccion = saldoActual - gastoProyectado + ingresosMes;
 
   const el = document.getElementById('proyeccionEl');
-  if(!el) return;
+  if(!el||!saldoBase) return;
   el.innerHTML = `
     <span style="color:var(--text-faint)">Quema diaria ~${fmt(gastoDiario)}</span>
-    <span style="margin:0 0.5rem;color:var(--border-bright)">·</span>
+    <span style="margin:0 0.6rem;color:var(--border)">·</span>
     <span style="color:var(--text-dim)">Proyección fin de mes:</span>
-    <span style="margin-left:0.4rem;font-weight:500;color:${proyeccion>=0?'var(--green)':'var(--red)'};font-family:'JetBrains Mono',monospace">${fmt(proyeccion)}</span>
-    ${ingresosMes>0?`<span style="margin-left:0.5rem;font-size:0.7rem;color:var(--green)">(+${fmt(ingresosMes)} ingresos)</span>`:''}
+    <span style="margin-left:0.4rem;font-weight:400;color:${proyeccion>=0?'var(--green)':'var(--red)'};font-family:'JetBrains Mono',monospace">${fmt(proyeccion)}</span>
+    ${ingresosMes>0?`<span style="margin-left:0.6rem;font-size:0.7rem;color:var(--green-dim);color:var(--green)">(+${fmt(ingresosMes)} ingresos este mes)</span>`:''}
   `;
 }
 
