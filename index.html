@@ -791,6 +791,8 @@ async function connectSheet() {
       });
       return obj;
     });
+    // Fallback: si fecha está vacío, usar raw_date
+    rows.forEach(r=>{ if(!r.fecha && r.raw_date) r.fecha = parseGvizDate(r.raw_date); });
     // Normalizar tipos y categorías
     rows.forEach(r=>{
       if(r.tipo==='gasto'||r.tipo==='compra'||r.tipo==='débito'||r.tipo==='debito') r.tipo='cargo';
